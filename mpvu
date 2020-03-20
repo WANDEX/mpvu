@@ -1,0 +1,108 @@
+#!/bin/sh
+# script that gives mpv URL
+# youtube-dl --playlist-end > get first N items from playlist
+PE=1
+
+main() {
+    # use $1 or default (clipboard)
+    URL="${1:-$(xclip -selection clipboard -out)}"
+    # substring in URL
+    case "$URL" in
+        *"youtu"*)
+            PROFILE='ytdl'
+            ytdl "$@"
+        ;;
+        *"videos"*)
+            PROFILE='vods'
+            ytdl "$@"
+        ;;
+        *"twitch"*)
+            PROFILE='stream'
+            strl "$@"
+        ;;
+        *"goodgame"*)
+            PROFILE='stream'
+            strl "$@"
+        ;;
+        *)
+            PROFILE='ytdl'
+            ytdl_check "$URL"
+            ytdl "$@"
+        ;;
+    esac >/dev/null
+}
+
+notify() {
+    STATUS='Playing...['"$PROFILE"']'
+    notify-send -t 5000 "$STATUS" "$TITLE"
+}
+
+ytdl_check() {
+    # youtube-dl URL verification, verify only first item if many
+    check="$(youtube-dl --playlist-end=1 --simulate "$1")"
+    return_code=$?
+    if [ "$return_code" -ne 0 ]; then
+        summary="youtube-dl:"
+        msg="TERMINATED\nInvalid URL,\nor just the first element from the URL"
+        notify-send -t 5000 -u critical "$summary" "$msg"
+        exit 1
+    fi
+}
+
+strl_check() {
+    # streamlink URL verification
+    check="$(streamlink --can-handle-url "$1")"
+    return_code=$?
+    if [ "$return_code" -ne 0 ]; then
+        summary="streamlink:"
+        msg="TERMINATED\nInvalid URL,\nstreamlink cannot process this URL"
+        notify-send -t 5000 -u critical "$summary" "$msg"
+        exit 1
+    fi
+}
+
+ytdl() {
+    # youtube-dl
+    WEBM='bestvideo[ext=webm][height<=?1080]+bestaudio[ext=webm]'
+    FALLBACK='bestvideo[height<=?1080]+bestaudio/best'
+    FORMAT="$WEBM"'/'"$FALLBACK"
+    notify
+    COMMAND=$(screen -dm mpv --ytdl-raw-options=playlist-end="$PE" --ytdl-format="$FORMAT" --profile="$PROFILE" "$URL")
+}
+
+strl() {
+    # streamlink
+    strl_check "$URL"
+    # use $2 or default (best)
+    QUALITY="${2:-"best"}"
+    # set QUALITY by the secondary argument
+    case "$QUALITY" in
+        *"best"*)
+            QUALITY="best"
+        ;;
+        *"4"*)
+            QUALITY="480p"
+        ;;
+        *"7"*)
+            QUALITY="720p"
+        ;;
+        *"6"*)
+            QUALITY="720p60"
+        ;;
+        *"a"*)
+            QUALITY="audio_only"
+        ;;
+        *)
+            QUALITY="best"
+        ;;
+    esac >/dev/null
+    # TITLE only for notify
+    TITLE=$(basename "$URL")' | ['"$QUALITY"']'
+    notify
+    # only streamlink knows this {*}
+    TITLE='{author} - {category} -- {title} | ['"$QUALITY"']'
+    COMMAND=$(screen -dm streamlink --title "$TITLE" "$URL" "$QUALITY")
+}
+
+main "$@"
+
