@@ -22,6 +22,12 @@ main() {
     get_defaults "$@"
     # substring in URL
     case "$URL" in
+        *"playlist"*)
+            PROFILE='ytdl'
+            QUALITY='audio'     # get only audio
+            PE='-1'             # get all items in the playlist
+            ytdl "$@"
+        ;;
         *"youtu"*)
             PROFILE='ytdl'
             ytdl "$@"
