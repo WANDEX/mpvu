@@ -1,11 +1,25 @@
 #!/bin/sh
 # script that gives mpv URL
+# default video height cap by the 2nd argument,
+# will be less if unavailable in youtube-dl or default
+H_CAP='1080'
 # youtube-dl --playlist-end > get first N items from playlist
-PE=1
+# by the 3rd argument or default N
+P_CAP='1'
+# prefer certain extension over FALLBACK in youtube-dl
+EXT='webm'
 
-main() {
+get_defaults() {
     # use $1 or default (clipboard)
     URL="${1:-$(xclip -selection clipboard -out)}"
+    # use $2 or default
+    HEIGHT="${2:-"$H_CAP"}"
+    # use $3 or default
+    PE="${3:-"$P_CAP"}"
+}
+
+main() {
+    get_defaults "$@"
     # substring in URL
     case "$URL" in
         *"youtu"*)
@@ -63,11 +77,44 @@ strl_check() {
 
 ytdl() {
     # youtube-dl
-    WEBM='bestvideo[ext=webm][height<=?1080]+bestaudio[ext=webm]'
-    FALLBACK='bestvideo[height<=?1080]+bestaudio/best'
-    FORMAT="$WEBM"'/'"$FALLBACK"
+    # set HEIGHT by the secondary argument
+    case "$HEIGHT" in
+        *"1"*)
+            HEIGHT="1080"
+        ;;
+        *"4"*)
+            HEIGHT="480"
+        ;;
+        *"7"*)
+            HEIGHT="720"
+        ;;
+        *"8"*)
+            HEIGHT="1080"
+        ;;
+        *"a"*)
+            QUALITY="audio"
+        ;;
+        *)
+            HEIGHT="$H_CAP"
+        ;;
+    esac >/dev/null
+    VIDEO='bestvideo[ext='"$EXT"'][height<=?'"$HEIGHT"']'
+    AUDIO='bestaudio[ext='"$EXT"']'
+    GLUED="$VIDEO"'+'"$AUDIO"
+    FALLBACKVIDEO='bestvideo[height<=?'"$HEIGHT"']'
+    FALLBACKAUDIO='bestaudio/best'
+    FORMAT="$GLUED"'/'"$FALLBACKVIDEO"'+'"$FALLBACKAUDIO"
+    # get audio only
+    case "$QUALITY" in
+        *"a"*)
+            QUALITY="$AUDIO"'/'"$FALLBACKAUDIO"
+        ;;
+        *)
+            QUALITY="$FORMAT"
+        ;;
+    esac >/dev/null
     notify
-    COMMAND=$(screen -dm mpv --ytdl-raw-options=playlist-end="$PE" --ytdl-format="$FORMAT" --profile="$PROFILE" "$URL")
+    COMMAND=$(screen -dm mpv --ytdl-raw-options=playlist-end="$PE" --ytdl-format="$QUALITY" --profile="$PROFILE" "$URL")
 }
 
 strl() {
