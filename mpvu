@@ -18,6 +18,15 @@ get_defaults() {
     PE="${3:-"$P_CAP"}"
 }
 
+notify() {
+    # call using ... &
+    # get title information, notify at the background and suppress error output
+    TITLE=$(youtube-dl --no-warnings --playlist-end=1 --get-title "$URL" 2> /dev/null)
+    STATUS='Playing... ['"$PROFILE"']'
+    MESSAGE="$TITLE"'\n'"$URL"
+    notify-send -t 5000 "$STATUS" "$MESSAGE"
+}
+
 main() {
     get_defaults "$@"
     # substring in URL
@@ -26,46 +35,51 @@ main() {
             PROFILE='ytdl'
             QUALITY='audio'     # get only audio
             PE='-1'             # get all items in the playlist
+            notify &
             ytdl "$@"
         ;;
         *"playlist"*)
             PROFILE='ytdl'
             QUALITY='audio'     # get only audio
             PE='-1'             # get all items in the playlist
+            notify &
             ytdl "$@"
         ;;
         *"youtu"*)
             PROFILE='ytdl'
+            notify &
             ytdl "$@"
         ;;
         *"videos"*)
             PROFILE='vods'
+            notify &
             ytdl "$@"
         ;;
         *"twitch"*)
             PROFILE='stream'
+            notify &
+            # only streamlink knows this {*}
+            TITLE='{author} - {category} -- {title}'
             strl "$@"
         ;;
         *"goodgame"*)
             PROFILE='stream'
+            notify &
+            TITLE=$(basename "$URL")
             strl "$@"
         ;;
         *)
             PROFILE='ytdl'
             ytdl_check "$URL"
+            notify &
             ytdl "$@"
         ;;
     esac >/dev/null
 }
 
-notify() {
-    STATUS='Playing...['"$PROFILE"']'
-    notify-send -t 5000 "$STATUS" "$TITLE"
-}
-
 ytdl_check() {
     # youtube-dl URL verification, verify only first item if many
-    check="$(youtube-dl --playlist-end=1 --simulate "$1")"
+    check="$(youtube-dl --no-warnings --playlist-end=1 --simulate "$1")"
     return_code=$?
     if [ "$return_code" -ne 0 ]; then
         summary="youtube-dl:"
@@ -125,7 +139,6 @@ ytdl() {
             QUALITY="$FORMAT"
         ;;
     esac >/dev/null
-    notify
     COMMAND=$(screen -dm mpv --ytdl-raw-options=playlist-end="$PE" --ytdl-format="$QUALITY" --profile="$PROFILE" "$URL")
 }
 
@@ -155,12 +168,8 @@ strl() {
             QUALITY="best"
         ;;
     esac >/dev/null
-    # TITLE only for notify
-    TITLE=$(basename "$URL")' | ['"$QUALITY"']'
-    notify
-    # only streamlink knows this {*}
-    TITLE='{author} - {category} -- {title} | ['"$QUALITY"']'
-    COMMAND=$(screen -dm streamlink --title "$TITLE" "$URL" "$QUALITY")
+    TITLE+=' | ['"$QUALITY"']'
+    COMMAND=$(screen -dm streamlink --quiet --title "$TITLE" "$URL" "$QUALITY")
 }
 
 main "$@"
