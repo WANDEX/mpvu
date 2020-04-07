@@ -32,14 +32,14 @@ main() {
     # substring in URL
     case "$URL" in
         *"soundcloud"*)
-            PROFILE='ytdl'
+            PROFILE='audio'
             QUALITY='audio'     # get only audio
             PE='-1'             # get all items in the playlist
             notify &
             ytdl "$@"
         ;;
         *"playlist"*)
-            PROFILE='ytdl'
+            PROFILE='audio'
             QUALITY='audio'     # get only audio
             PE='-1'             # get all items in the playlist
             notify &
