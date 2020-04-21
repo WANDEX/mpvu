@@ -50,12 +50,14 @@ main() {
             notify &
             ytdl "$@"
         ;;
-        *"videos"*)
+        *"twitch"*"/videos/"*)
             PROFILE='vods'
             notify &
             ytdl "$@"
         ;;
         *"twitch"*)
+            # fix for streamlink
+            [ $(basename "$URL") == 'videos' ] && URL=$(dirname "$URL")
             PROFILE='stream'
             notify &
             # only streamlink knows this {*}
@@ -168,7 +170,7 @@ strl() {
             QUALITY="best"
         ;;
     esac >/dev/null
-    TITLE+=' | ['"$QUALITY"']'
+    TITLE+=' | ['"$QUALITY"'] [STREAM]'
     COMMAND=$(screen -dm streamlink --quiet --title "$TITLE" "$URL" "$QUALITY")
 }
 
