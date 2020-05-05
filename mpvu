@@ -70,6 +70,11 @@ main() {
             TITLE=$(basename "$URL")
             strl "$@"
         ;;
+        "magnet:?"*|*".torrent")
+            notify-send -t 5000 "Playing... [torrent]" &
+            # open through webtorrent-hook.lua
+            mpv "$URL"
+        ;;
         *)
             PROFILE='ytdl'
             ytdl_check "$URL"
