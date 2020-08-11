@@ -10,10 +10,8 @@ P_CAP='1'
 EXT='webm'
 
 get_defaults() {
-    # use $1 or default (clipboard)
-    URL="${1:-$(xclip -selection clipboard -out)}"
-    # use $2 or default
-    HEIGHT="${2:-"$H_CAP"}"
+    # use $2 or default (clipboard)
+    URL="${2:-$(xclip -selection clipboard -out)}"
     # use $3 or default
     PE="${3:-"$P_CAP"}"
 }
@@ -110,13 +108,21 @@ strl_check() {
 
 ytdl() {
     # youtube-dl
+    # use $1 or default
+    HEIGHT="${1:-"$H_CAP"}"
     # set HEIGHT by the secondary argument
     case "$HEIGHT" in
+        *"s"*)
+            HEIGHT="$H_CAP"
+        ;;
         *"1"*)
             HEIGHT="1080"
         ;;
         *"4"*)
             HEIGHT="480"
+        ;;
+        *"6"*)
+            HEIGHT="720"
         ;;
         *"7"*)
             HEIGHT="720"
@@ -146,27 +152,36 @@ ytdl() {
             QUALITY="$FORMAT"
         ;;
     esac >/dev/null
-    COMMAND=$(screen -dm mpv --ytdl-raw-options=playlist-end="$PE" --ytdl-format="$QUALITY" --profile="$PROFILE" "$URL")
+    setsid -f mpv --ytdl-raw-options=playlist-end="$PE" --ytdl-format="$QUALITY" --profile="$PROFILE" "$URL" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
 }
 
 strl() {
     # streamlink
     strl_check "$URL"
-    # use $2 or default (best)
-    QUALITY="${2:-"best"}"
+    # use $1 or default (best)
+    QUALITY="${1:-"best"}"
     # set QUALITY by the secondary argument
     case "$QUALITY" in
         *"best"*)
             QUALITY="best"
         ;;
+        *"s"*)
+            QUALITY="best"
+        ;;
+        *"1"*)
+            QUALITY="best"
+        ;;
         *"4"*)
             QUALITY="480p"
+        ;;
+        *"6"*)
+            QUALITY="720p60"
         ;;
         *"7"*)
             QUALITY="720p"
         ;;
-        *"6"*)
-            QUALITY="720p60"
+        *"8"*)
+            QUALITY="best"
         ;;
         *"a"*)
             QUALITY="audio_only"
@@ -176,7 +191,7 @@ strl() {
         ;;
     esac >/dev/null
     TITLE+=' | ['"$QUALITY"'] [STREAM]'
-    COMMAND=$(screen -dm streamlink --quiet --title "$TITLE" "$URL" "$QUALITY")
+    setsid -f streamlink --quiet --title "$TITLE" "$URL" "$QUALITY" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
 }
 
 main "$@"
