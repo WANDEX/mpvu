@@ -1,20 +1,66 @@
 #!/bin/sh
 # script that gives mpv URL
-# default video height cap by the 2nd argument,
-# will be less if unavailable in youtube-dl or default
-H_CAP='1080'
-# youtube-dl --playlist-end > get first N items from playlist
-# by the 3rd argument or default N
-P_CAP='1'
-# prefer certain extension over FALLBACK in youtube-dl
-EXT='webm'
 
-get_defaults() {
-    # use $2 or default (clipboard)
-    URL="${2:-$(xclip -selection clipboard -out)}"
-    # use $3 or default
-    PE="${3:-"$P_CAP"}"
+# read into variable using 'Here Document' code block
+read -d '' USAGE <<- EOF
+Usage: $(basename $BASH_SOURCE) [OPTION...]
+OPTIONS
+    -e, --end       If url is playlist - how many items to download (default:1)
+    -h, --help      Display help
+    -q, --quality   Quality of video/stream
+    -u, --url       URL of video/stream
+EOF
+
+get_opt() {
+    # Parse and read OPTIONS command-line options
+    SHORT=e:hq:u:
+    LONG=end:,help,quality:,url:
+    OPTIONS=$(getopt --options $SHORT --long $LONG --name "$0" -- "$@")
+    # PLACE FOR OPTION DEFAULTS
+    URL="$(xclip -selection clipboard -out)"
+    YTDL_Q='1080' # video height cap, will be less if unavailable in youtube-dl
+    STRL_Q='best' # default quality in streamlink
+    END=1         # youtube-dl --playlist-end > get first N items from playlist
+    EXT='webm'    # prefer certain extension over FALLBACK in youtube-dl
+    eval set -- "$OPTIONS"
+    while true; do
+        case "$1" in
+        -e|--end)
+            shift
+            case $1 in
+                0*)
+                    printf "($1)\n^ unsupported number! exit.\n"
+                    exit 1
+                    ;;
+                ''|*[!0-9]*)
+                    printf "($1)\n^ IS NOT A NUMBER OF INT! exit.\n"
+                    exit 1
+                    ;;
+                *) END=$1 ;;
+            esac
+            ;;
+        -h|--help)
+            echo "$USAGE"
+            exit 0
+            ;;
+        -q|--quality)
+            shift
+            QUALITY="$1"
+            ;;
+        -u|--url)
+            shift
+            URL="$1"
+            ;;
+        --)
+            shift
+            break
+            ;;
+        esac
+        shift
+    done
 }
+
+get_opt "$@"
 
 notify() {
     # call using ... &
@@ -26,20 +72,19 @@ notify() {
 }
 
 main() {
-    get_defaults "$@"
     # substring in URL
     case "$URL" in
         *"soundcloud"*)
             PROFILE='audio'
             QUALITY='audio'     # get only audio
-            PE='-1'             # get all items in the playlist
+            END='-1'            # get all items in the playlist
             notify &
             ytdl "$@"
         ;;
         *"playlist"*)
             PROFILE='audio'
             QUALITY='audio'     # get only audio
-            PE='-1'             # get all items in the playlist
+            END='-1'            # get all items in the playlist
             notify &
             ytdl "$@"
         ;;
@@ -108,12 +153,10 @@ strl_check() {
 
 ytdl() {
     # youtube-dl
-    # use $1 or default
-    HEIGHT="${1:-"$H_CAP"}"
-    # set HEIGHT by the secondary argument
+    HEIGHT="${QUALITY:-"$YTDL_Q"}"
     case "$HEIGHT" in
         *"s"*)
-            HEIGHT="$H_CAP"
+            HEIGHT="$YTDL_Q"
         ;;
         *"1"*)
             HEIGHT="1080"
@@ -134,7 +177,7 @@ ytdl() {
             QUALITY="audio"
         ;;
         *)
-            HEIGHT="$H_CAP"
+            HEIGHT="$YTDL_Q"
         ;;
     esac >/dev/null
     VIDEO='bestvideo[ext='"$EXT"'][height<=?'"$HEIGHT"']'
@@ -152,15 +195,13 @@ ytdl() {
             QUALITY="$FORMAT"
         ;;
     esac >/dev/null
-    setsid -f mpv --ytdl-raw-options=playlist-end="$PE" --ytdl-format="$QUALITY" --profile="$PROFILE" "$URL" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
+    setsid -f mpv --ytdl-raw-options=playlist-end="$END" --ytdl-format="$QUALITY" --profile="$PROFILE" "$URL" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
 }
 
 strl() {
     # streamlink
     strl_check "$URL"
-    # use $1 or default (best)
-    QUALITY="${1:-"best"}"
-    # set QUALITY by the secondary argument
+    QUALITY="${QUALITY:-"$STRL_Q"}"
     case "$QUALITY" in
         *"best"*)
             QUALITY="best"
