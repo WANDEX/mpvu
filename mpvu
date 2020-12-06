@@ -234,6 +234,20 @@ strl() {
     esac >/dev/null
     TITLE+=' | ['"$QUALITY"'] [STREAM]'
     setsid -f streamlink --quiet --title "$TITLE" "$URL" "$QUALITY" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
+    #setsid -f streamlink --quiet --title "$TITLE" "$URL" "$QUALITY" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
+
+    slp=5
+    num=1
+    while [[ $num -lt 2 ]]; do
+        streamlink --quiet --title "$TITLE" "$URL" "$QUALITY"
+        #|| notify-send -u critical -t 1000 "[stream]:$(basename $URL) ERROR" "unreachable"
+        notify-send -t 1000 -u low \
+            "[stream]:$(basename $URL)  try  reconnect." \
+            "sleep $slp sec (attempt:$num)"
+        sleep $slp
+        num=$(echo "$num+1" | bc)
+    done
+    notify-send -u critical "[stream]:$(basename $URL) seems like ended. exit." "\n$URL"
 }
 
 main "$@"
