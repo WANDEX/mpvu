@@ -5,6 +5,7 @@
 read -d '' USAGE <<- EOF
 Usage: $(basename $BASH_SOURCE) [OPTION...]
 OPTIONS
+    -a, --attempts  How many attempts to make to reconnect to stream
     -e, --end       If url is playlist - how many items to download (default:1)
     -h, --help      Display help
     -q, --quality   Quality of video/stream
@@ -13,8 +14,8 @@ EOF
 
 get_opt() {
     # Parse and read OPTIONS command-line options
-    SHORT=e:hq:u:
-    LONG=end:,help,quality:,url:
+    SHORT=a:e:hq:u:
+    LONG=attempts:,end:,help,quality:,url:
     OPTIONS=$(getopt --options $SHORT --long $LONG --name "$0" -- "$@")
     # PLACE FOR OPTION DEFAULTS
     URL="$(xclip -selection clipboard -out)"
@@ -22,9 +23,16 @@ get_opt() {
     STRL_Q='best' # default quality in streamlink
     END=1         # youtube-dl --playlist-end > get first N items from playlist
     EXT='webm'    # prefer certain extension over FALLBACK in youtube-dl
+    attempts=1
+    slp=5
+    num=1
     eval set -- "$OPTIONS"
     while true; do
         case "$1" in
+        -a|--attempts)
+            shift
+            attempts=$1
+            ;;
         -e|--end)
             shift
             case $1 in
@@ -233,21 +241,14 @@ strl() {
         ;;
     esac >/dev/null
     TITLE+=' | ['"$QUALITY"'] [STREAM]'
-    setsid -f streamlink --quiet --title "$TITLE" "$URL" "$QUALITY" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
-    #setsid -f streamlink --quiet --title "$TITLE" "$URL" "$QUALITY" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
-
-    slp=5
-    num=1
-    while [[ $num -lt 2 ]]; do
+    while [ "$num" -le "$attempts" ]; do
         streamlink --quiet --title "$TITLE" "$URL" "$QUALITY"
-        #|| notify-send -u critical -t 1000 "[stream]:$(basename $URL) ERROR" "unreachable"
-        notify-send -t 1000 -u low \
+        [ "$attempts" -gt 1 ] && notify-send -t 1000 -u low \
             "[stream]:$(basename $URL)  try  reconnect." \
-            "sleep $slp sec (attempt:$num)"
-        sleep $slp
+            "sleep $slp sec (attempt:$num)" && sleep $slp
         num=$(echo "$num+1" | bc)
     done
-    notify-send -u critical "[stream]:$(basename $URL) seems like ended. exit." "\n$URL"
+    notify-send -u critical "[stream][end]:$(basename $URL) EXIT" "\n$URL"
 }
 
 main "$@"
