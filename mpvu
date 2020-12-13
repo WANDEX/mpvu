@@ -75,7 +75,7 @@ notify() {
     # call using ... &
     # get title information, notify at the background and suppress error output
     TITLE=$(youtube-dl --no-warnings --playlist-end=1 --get-title "$URL" 2> /dev/null)
-    STATUS='Playing... ['"$PROFILE"']'
+    STATUS='['"$PROFILE"'] Playing...'
     MESSAGE="$TITLE"'\n'"$URL"
     notify-send -t 5000 "$STATUS" "$MESSAGE"
 }
@@ -123,7 +123,7 @@ main() {
             strl "$@"
         ;;
         "magnet:?"*|*".torrent")
-            notify-send -t 5000 "Playing... [torrent]" &
+            notify-send -t 5000 "[torrent] Playing..." &
             # open through webtorrent-hook.lua
             mpv "$URL"
         ;;
@@ -245,10 +245,10 @@ strl() {
         streamlink --quiet --title "$TITLE" "$URL" "$QUALITY"
         [ "$attempts" -gt 1 ] && notify-send -t 1000 -u low \
             "[stream]:$(basename $URL)  try  reconnect." \
-            "sleep $slp sec (attempt:$num)" && sleep $slp
+            "sleep $slp sec attempts:($num/$attempts)" && sleep $slp
         num=$(echo "$num+1" | bc)
     done
-    notify-send -u critical "[stream][end]:$(basename $URL) EXIT" "\n$URL"
+    notify-send "[stream][end]:$(basename $URL) EXIT" "\n$URL"
 }
 
 main "$@"
