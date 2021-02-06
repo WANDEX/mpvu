@@ -80,62 +80,6 @@ notify() {
     notify-send -t 5000 "$STATUS" "$MESSAGE"
 }
 
-main() {
-    # substring in URL
-    case "$URL" in
-        *"soundcloud"*)
-            PROFILE='audio'
-            QUALITY='audio'     # get only audio
-            END='-1'            # get all items in the playlist
-            notify &
-            ytdl "$@"
-        ;;
-        *"playlist"*)
-            PROFILE='audio'
-            QUALITY='audio'     # get only audio
-            END='-1'            # get all items in the playlist
-            notify &
-            ytdl "$@"
-        ;;
-        *"youtu"*)
-            PROFILE='ytdl'
-            notify &
-            ytdl "$@"
-        ;;
-        *"twitch"*"/videos/"*)
-            PROFILE='vods'
-            notify &
-            ytdl "$@"
-        ;;
-        *"twitch"*)
-            # fix for streamlink
-            [ $(basename "$URL") == 'videos' ] && URL=$(dirname "$URL")
-            PROFILE='stream'
-            notify &
-            # only streamlink knows this {*}
-            TITLE='{author} - {category} -- {title}'
-            strl "$@"
-        ;;
-        *"goodgame"*)
-            PROFILE='stream'
-            notify &
-            TITLE=$(basename "$URL")
-            strl "$@"
-        ;;
-        "magnet:?"*|*".torrent")
-            notify-send -t 5000 "[torrent] Playing..." &
-            # open through webtorrent-hook.lua
-            mpv "$URL"
-        ;;
-        *)
-            PROFILE='ytdl'
-            ytdl_check "$URL"
-            notify &
-            ytdl "$@"
-        ;;
-    esac >/dev/null
-}
-
 ytdl_check() {
     # youtube-dl URL verification, verify only first item if many
     check="$(youtube-dl --no-warnings --playlist-end=1 --simulate "$1")"
@@ -249,6 +193,62 @@ strl() {
         num=$(echo "$num+1" | bc)
     done
     notify-send "[stream][end]:$(basename $URL) EXIT" "\n$URL"
+}
+
+main() {
+    # substring in URL
+    case "$URL" in
+        *"soundcloud"*)
+            PROFILE='audio'
+            QUALITY='audio'     # get only audio
+            END='-1'            # get all items in the playlist
+            notify &
+            ytdl "$@"
+        ;;
+        *"playlist"*)
+            PROFILE='audio'
+            QUALITY='audio'     # get only audio
+            END='-1'            # get all items in the playlist
+            notify &
+            ytdl "$@"
+        ;;
+        *"youtu"*)
+            PROFILE='ytdl'
+            notify &
+            ytdl "$@"
+        ;;
+        *"twitch"*"/videos/"*)
+            PROFILE='vods'
+            notify &
+            ytdl "$@"
+        ;;
+        *"twitch"*)
+            # fix for streamlink
+            [ $(basename "$URL") == 'videos' ] && URL=$(dirname "$URL")
+            PROFILE='stream'
+            notify &
+            # only streamlink knows this {*}
+            TITLE='{author} - {category} -- {title}'
+            strl "$@"
+        ;;
+        *"goodgame"*)
+            PROFILE='stream'
+            notify &
+            TITLE=$(basename "$URL")
+            strl "$@"
+        ;;
+        "magnet:?"*|*".torrent")
+            notify-send -t 5000 "[torrent] Playing..." &
+            # open through webtorrent-hook.lua
+            mpv "$URL"
+        ;;
+        *)
+            PROFILE='ytdl'
+            ytdl_check "$URL"
+            notify &
+            ytdl "$@"
+        ;;
+    esac >/dev/null
 }
 
 main "$@"
