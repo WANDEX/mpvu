@@ -10,12 +10,13 @@ OPTIONS
     -h, --help      Display help
     -q, --quality   Quality of video/stream
     -u, --url       URL of video/stream
+    --quiet         Don't show notify message (except ERRORS)
 EOF
 
 get_opt() {
     # Parse and read OPTIONS command-line options
     SHORT=a:e:hq:u:
-    LONG=attempts:,end:,help,quality:,url:
+    LONG=attempts:,end:,help,quality:,url:,quiet
     OPTIONS=$(getopt --options $SHORT --long $LONG --name "$0" -- "$@")
     # PLACE FOR OPTION DEFAULTS
     URL="$(xclip -selection clipboard -out)"
@@ -26,6 +27,7 @@ get_opt() {
     attempts=1
     slp=5
     num=1
+    QUIET=0
     eval set -- "$OPTIONS"
     while true; do
         case "$1" in
@@ -59,6 +61,9 @@ get_opt() {
         -u|--url)
             shift
             URL="$1"
+            ;;
+        --quiet)
+            QUIET=1
             ;;
         --)
             shift
@@ -192,7 +197,7 @@ strl() {
             "sleep $slp sec attempts:($num/$attempts)" && sleep $slp
         num=$(echo "$num+1" | bc)
     done
-    notify-send "[stream][end]:$(basename $URL) EXIT" "\n$URL"
+    [ "$QUIET" -eq 0 ] && notify-send "[stream][end]:$(basename $URL) EXIT" "\n$URL"
 }
 
 main() {
@@ -202,50 +207,50 @@ main() {
             PROFILE='audio'
             QUALITY='audio'     # get only audio
             END='-1'            # get all items in the playlist
-            notify &
+            [ "$QUIET" -eq 0 ] && notify &
             ytdl "$@"
         ;;
         *"playlist"*)
             PROFILE='audio'
             QUALITY='audio'     # get only audio
             END='-1'            # get all items in the playlist
-            notify &
+            [ "$QUIET" -eq 0 ] && notify &
             ytdl "$@"
         ;;
         *"youtu"*)
             PROFILE='ytdl'
-            notify &
+            [ "$QUIET" -eq 0 ] && notify &
             ytdl "$@"
         ;;
         *"twitch"*"/videos/"*)
             PROFILE='vods'
-            notify &
+            [ "$QUIET" -eq 0 ] && notify &
             ytdl "$@"
         ;;
         *"twitch"*)
             # fix for streamlink
             [ $(basename "$URL") == 'videos' ] && URL=$(dirname "$URL")
             PROFILE='stream'
-            notify &
+            [ "$QUIET" -eq 0 ] && notify &
             # only streamlink knows this {*}
             TITLE='{author} - {category} -- {title}'
             strl "$@"
         ;;
         *"goodgame"*)
             PROFILE='stream'
-            notify &
+            [ "$QUIET" -eq 0 ] && notify &
             TITLE=$(basename "$URL")
             strl "$@"
         ;;
         "magnet:?"*|*".torrent")
-            notify-send -t 5000 "[torrent] Playing..." &
+            [ "$QUIET" -eq 0 ] && notify-send -t 5000 "[torrent] Playing..." &
             # open through webtorrent-hook.lua
             mpv "$URL"
         ;;
         *)
             PROFILE='ytdl'
             ytdl_check "$URL"
-            notify &
+            [ "$QUIET" -eq 0 ] && notify &
             ytdl "$@"
         ;;
     esac >/dev/null
