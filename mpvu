@@ -244,6 +244,7 @@ main() {
         ;;
         "magnet:?"*|*".torrent")
             [ "$QUIET" -eq 0 ] && notify-send -t 5000 "[torrent] Playing..." &
+            hash stig && stig add "$URL" # if stig is available at $PATH
             # open through webtorrent-hook.lua
             mpv "$URL"
         ;;
