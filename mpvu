@@ -1,9 +1,8 @@
 #!/bin/sh
-# script that gives mpv URL
+# open video/stream URL in mpv
 
-# read into variable using 'Here Document' code block
-read -d '' USAGE <<- EOF
-Usage: $(basename $BASH_SOURCE) [OPTION...]
+USAGE=$(printf "%s" "\
+Usage: $(basename "$0") [OPTION...]
 OPTIONS
     -a, --attempts  How many attempts to make to reconnect to stream
     -e, --end       If url is playlist - how many items to download (default:1)
@@ -11,7 +10,7 @@ OPTIONS
     -q, --quality   Quality of video/stream
     -u, --url       URL of video/stream
     --quiet         Don't show notify message (except ERRORS)
-EOF
+")
 
 get_opt() {
     # Parse and read OPTIONS command-line options
@@ -40,11 +39,11 @@ get_opt() {
             case $1 in
                 -1) END=-1 ;; # get full playlist
                 0*)
-                    printf "($1)\n^ unsupported number! exit.\n"
+                    printf "(%s)\n%s\n" "$1" "^ unsupported number! exit."
                     exit 1
                     ;;
                 ''|*[!0-9]*)
-                    printf "($1)\n^ IS NOT A NUMBER OF INT! exit.\n"
+                    printf "(%s)\n%s\n" "$1" "^ IS NOT A NUMBER OF INT! exit."
                     exit 1
                     ;;
                 *) END=$1 ;;
@@ -87,7 +86,7 @@ notify() {
 
 ytdl_check() {
     # youtube-dl URL verification, verify only first item if many
-    check="$(youtube-dl --no-warnings --playlist-end=1 --simulate "$1")"
+    youtube-dl --no-warnings --playlist-end=1 --simulate "$1"
     return_code=$?
     if [ "$return_code" -ne 0 ]; then
         summary="youtube-dl:"
@@ -99,7 +98,7 @@ ytdl_check() {
 
 strl_check() {
     # streamlink URL verification
-    check="$(streamlink --can-handle-url "$1")"
+    streamlink --can-handle-url "$1"
     return_code=$?
     if [ "$return_code" -ne 0 ]; then
         summary="streamlink:"
@@ -189,15 +188,16 @@ strl() {
             QUALITY="best"
         ;;
     esac >/dev/null
-    TITLE+=' | ['"$QUALITY"'] [STREAM]'
+    BN="$(basename "$URL")"
+    TITLE="$TITLE | [$QUALITY] [STREAM]"
     while [ "$num" -le "$attempts" ]; do
         streamlink --quiet --title "$TITLE" "$URL" "$QUALITY"
         [ "$attempts" -gt 1 ] && notify-send -t 1000 -u low \
-            "[stream]:$(basename $URL)  try  reconnect." \
+            "[stream]:$BN  try  reconnect." \
             "sleep $slp sec attempts:($num/$attempts)" && sleep $slp
         num=$(echo "$num+1" | bc)
     done
-    [ "$QUIET" -eq 0 ] && notify-send "[stream][end]:$(basename $URL) EXIT" "\n$URL"
+    [ "$QUIET" -eq 0 ] && notify-send "[stream][end]:$BN EXIT" "\n$URL"
 }
 
 main() {
@@ -228,8 +228,8 @@ main() {
             ytdl "$@"
         ;;
         *"twitch"*)
-            # fix for streamlink
-            [ $(basename "$URL") == 'videos' ] && URL=$(dirname "$URL")
+            # if the last element of the url path is 'videos', strip it from the url.
+            [ "$(basename "$URL")" = 'videos' ] && URL=$(dirname "$URL")
             PROFILE='stream'
             [ "$QUIET" -eq 0 ] && notify &
             # only streamlink knows this {*}
