@@ -1,16 +1,21 @@
 #!/bin/sh
 # open video/stream URL in mpv
 
-USAGE=$(printf "%s" "\
+# set -e
+
+# change main executable: youtube-dl, yt-dlp
+ytdl_exec="yt-dlp"
+
+USAGE="\
 Usage: $(basename "$0") [OPTION...]
 OPTIONS
-    -a, --attempts  How many attempts to make to reconnect to stream
-    -e, --end       If url is playlist - how many items to download (default:1)
+    -a, --attempts  How many attempts to make for reconnect to the stream
+    -e, --end       If url is playlist - how many items to play (default:1)
     -h, --help      Display help
     -q, --quality   Quality of video/stream
     -u, --url       URL of video/stream
-    --quiet         Don't show notify message (except ERRORS)
-")
+    --quiet         Do not show notify message (except ERRORS)
+"
 
 get_opt() {
     # Parse and read OPTIONS command-line options
@@ -18,21 +23,22 @@ get_opt() {
     LONG=attempts:,end:,help,quality:,url:,quiet
     OPTIONS=$(getopt --options $SHORT --long $LONG --name "$0" -- "$@")
     # PLACE FOR OPTION DEFAULTS
-    URL="$(xclip -selection clipboard -out)"
-    YTDL_Q='1080' # video height cap, will be less if unavailable in youtube-dl
+    URL=$(xclip -selection clipboard -out)
+    YTDL_Q='1080' # video height cap, will be less if unavailable in ytdl_exec
     STRL_Q='best' # default quality in streamlink
-    END=1         # youtube-dl --playlist-end > get first N items from playlist
-    EXT='webm'    # prefer certain extension over FALLBACK in youtube-dl
-    attempts=1
+    END=1         # ytdl_exec --playlist-end > get first N items from playlist
+    EXT='webm'    # prefer specific extension over fallback
+    UQLT='1080'   # upper bound video height cap, specific for the extension EXT
+    LQLT='720'    # lower bound -//- [hardcoded] (if unavailable for the EXT -> fallback)
+    attempts_total=1
     slp=5
-    num=1
     QUIET=0
     eval set -- "$OPTIONS"
     while true; do
         case "$1" in
         -a|--attempts)
             shift
-            attempts=$1
+            attempts_total=$1
             ;;
         -e|--end)
             shift
@@ -78,20 +84,20 @@ get_opt "$@"
 notify() {
     # call using ... &
     # get title information, notify at the background and suppress error output
-    TITLE=$(youtube-dl --no-warnings --playlist-end=1 --get-title "$URL" 2> /dev/null)
-    STATUS='['"$PROFILE"'] Playing...'
-    MESSAGE="$TITLE"'\n'"$URL"
-    notify-send -t 5000 "$STATUS" "$MESSAGE"
+    _title=$("$ytdl_exec" --no-warnings --playlist-end=1 --get-title "$URL" 2> /dev/null)
+    _status="[${PROFILE}] Playing..."
+    _msg="${_title}\n${URL}"
+    notify-send "$_status" "$_msg"
 }
 
 ytdl_check() {
-    # youtube-dl URL verification, verify only first item if many
-    youtube-dl --no-warnings --playlist-end=1 --simulate "$1"
+    # ytdl_exec URL verification, verify only first item if many
+    "$ytdl_exec" --no-warnings --playlist-end=1 --simulate "$1"
     return_code=$?
     if [ "$return_code" -ne 0 ]; then
-        summary="youtube-dl:"
+        summary="$ytdl_exec:"
         msg="TERMINATED\nInvalid URL,\nor just the first element from the URL"
-        notify-send -t 5000 -u critical "$summary" "$msg"
+        notify-send -u critical "$summary" "$msg"
         exit 1
     fi
 }
@@ -103,13 +109,13 @@ strl_check() {
     if [ "$return_code" -ne 0 ]; then
         summary="streamlink:"
         msg="TERMINATED\nInvalid URL,\nstreamlink cannot process this URL"
-        notify-send -t 5000 -u critical "$summary" "$msg"
+        notify-send -u critical "$summary" "$msg"
         exit 1
     fi
 }
 
 ytdl() {
-    # youtube-dl
+    # ytdl_exec
     HEIGHT="${QUALITY:-"$YTDL_Q"}"
     case "$HEIGHT" in
         *"s"*)
@@ -136,23 +142,30 @@ ytdl() {
         *)
             HEIGHT="$YTDL_Q"
         ;;
-    esac >/dev/null
-    VIDEO='bestvideo[ext='"$EXT"'][height<=?'"$HEIGHT"']'
-    AUDIO='bestaudio[ext='"$EXT"']'
-    GLUED="$VIDEO"'+'"$AUDIO"
-    FALLBACKVIDEO='bestvideo[height<=?'"$HEIGHT"']'
-    FALLBACKAUDIO='bestaudio/best'
-    FORMAT="$GLUED"'/'"$FALLBACKVIDEO"'+'"$FALLBACKAUDIO"
-    # get audio only
+    esac
+    ## ext specific
+    _ext_video_q="bestvideo[ext=${EXT}][height<=${UQLT}][height>=${LQLT}]"
+    _ext_audio_q="bestaudio[ext=${EXT}]"
+    _ext_specs_q="${_ext_video_q}+${_ext_audio_q}"
+    ## fallback
+    _fll_video_q="bestvideo[height<=${UQLT}]"
+    _fll_audio_q="bestaudio"
+    _fll_specs_q="${_fll_video_q}+${_fll_audio_q}"
+    ## full audio/video format string with fallbacks split by the '/'
+    ## NOTE: uncomment one of the followings
+    # _ytdl_format="${_ext_specs_q}/${_fll_specs_q}/best"
+    # _ytdl_format="${_fll_specs_q}/best"
+    _ytdl_format="best"
+    ## get audio only
     case "$QUALITY" in
         *"a"*)
-            QUALITY="$AUDIO"'/'"$FALLBACKAUDIO"
+            ytdl_format="${_ext_audio_q}/${_fll_audio_q}"
         ;;
         *)
-            QUALITY="$FORMAT"
+            ytdl_format="$_ytdl_format"
         ;;
-    esac >/dev/null
-    setsid -f mpv --ytdl-raw-options=playlist-end="$END" --ytdl-format="$QUALITY" --profile="$PROFILE" "$URL" || notify-send -u critical -t 2000 "ERROR" "maybe wrong quality?"
+    esac
+    mpv --ytdl-raw-options=playlist-end="$END" --ytdl-format="$ytdl_format" --profile="$PROFILE" "$URL"
 }
 
 strl() {
@@ -187,17 +200,18 @@ strl() {
         *)
             QUALITY="best"
         ;;
-    esac >/dev/null
-    BN="$(basename "$URL")"
+    esac
+    bn_url=$(basename "$URL")
     TITLE="$TITLE | [$QUALITY] [STREAM]"
-    while [ "$num" -le "$attempts" ]; do
+    attempts=1
+    while [ "$attempts" -le "$attempts_total" ]; do
         streamlink --quiet --title "$TITLE" "$URL" "$QUALITY"
-        [ "$attempts" -gt 1 ] && notify-send -t 1000 -u low \
-            "[stream]:$BN  try  reconnect." \
-            "sleep $slp sec attempts:($num/$attempts)" && sleep $slp
-        num=$(echo "$num+1" | bc)
+        [ "$attempts_total" -gt 1 ] && notify-send -t 1000 -u low \
+            "[stream]:$bn_url  try  reconnect." \
+            "sleep $slp sec attempts:($attempts/$attempts_total)" && sleep $slp
+        attempts=$((attempts+1))
     done
-    [ "$QUIET" -eq 0 ] && notify-send "[stream][end]:$BN EXIT" "\n$URL"
+    [ "$QUIET" -eq 0 ] && notify-send "[stream][end]:$bn_url EXIT" "\n$URL"
 }
 
 main() {
@@ -243,9 +257,9 @@ main() {
             strl "$@"
         ;;
         "magnet:?"*|*".torrent")
-            [ "$QUIET" -eq 0 ] && notify-send -t 5000 "[torrent] Playing..." &
+            [ "$QUIET" -eq 0 ] && notify-send -u low "[torrent] Playing..." &
             hash stig && stig add "$URL" # if stig is available at $PATH
-            # open through webtorrent-hook.lua
+            # opens with webtorrent.js or webtorrent-hook.lua
             mpv "$URL"
         ;;
         *)
@@ -254,7 +268,7 @@ main() {
             [ "$QUIET" -eq 0 ] && notify &
             ytdl "$@"
         ;;
-    esac >/dev/null
+    esac
 }
 
 main "$@"
