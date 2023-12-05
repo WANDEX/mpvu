@@ -118,9 +118,6 @@ ytdl() {
     # ytdl_exec
     HEIGHT="${QUALITY:-"$YTDL_Q"}"
     case "$HEIGHT" in
-        *"s"*)
-            HEIGHT="$YTDL_Q"
-        ;;
         *"1"*)
             HEIGHT="1080"
         ;;
@@ -136,33 +133,41 @@ ytdl() {
         *"8"*)
             HEIGHT="1080"
         ;;
-        *"a"*)
-            QUALITY="audio"
-        ;;
         *)
             HEIGHT="$YTDL_Q"
         ;;
     esac
     ## ext specific
-    _ext_video_q="bestvideo[ext=${EXT}][height<=${UQLT}][height>=${LQLT}]"
+    _ext_video_q="bestvideo[ext=${EXT}][height>=${LQLT}][height<=${UQLT}]"
     _ext_audio_q="bestaudio[ext=${EXT}]"
     _ext_specs_q="${_ext_video_q}+${_ext_audio_q}"
     ## fallback
-    _fll_video_q="bestvideo[height<=${UQLT}]"
+    _fll_video_q="bestvideo[height>=${LQLT}][height<=${UQLT}]"
     _fll_audio_q="bestaudio"
     _fll_specs_q="${_fll_video_q}+${_fll_audio_q}"
+    _thebest_avq="bestvideo+bestaudio/best"
     ## full audio/video format string with fallbacks split by the '/'
-    ## NOTE: uncomment one of the followings
-    # _ytdl_format="${_ext_specs_q}/${_fll_specs_q}/best"
-    # _ytdl_format="${_fll_specs_q}/best"
-    _ytdl_format="best"
+    ## NOTE: alternate/specify one of the followings in the next switch case [default]
+    _ytdl_format_ext="${_ext_specs_q}/${_fll_specs_q}/${_thebest_avq}"
+    _ytdl_format_fll="${_fll_specs_q}/${_thebest_avq}"
+    _ytdl_format_merge_best="${_thebest_avq}"
+    _ytdl_format_pre_merged="best"
     ## get audio only
     case "$QUALITY" in
-        *"a"*)
+        [Aa]*) # [a - stands for audio] audio_only
             ytdl_format="${_ext_audio_q}/${_fll_audio_q}"
         ;;
-        *)
-            ytdl_format="$_ytdl_format"
+        [Bb]*) # [b - stands for the best] merge of bestvideo & bestaudio
+            ytdl_format="$_thebest_avq"
+        ;;
+        [Cc]*) # [c - best (pre-encoded)] simple format which not requires merge of the av streams
+            ytdl_format="best"
+        ;;
+        [Ss]*)
+            ytdl_format="$_thebest_avq"
+        ;;
+        *) # [default] if not explicitly selected/passed via -q|-quality option
+            ytdl_format="$_ytdl_format_ext"
         ;;
     esac
     mpv --ytdl-raw-options=playlist-end="$END" --ytdl-format="$ytdl_format" --profile="$PROFILE" "$URL"
@@ -173,10 +178,16 @@ strl() {
     strl_check "$URL"
     QUALITY="${QUALITY:-"$STRL_Q"}"
     case "$QUALITY" in
-        *"best"*)
+        [Aa]*)
+            QUALITY="audio_only"
+        ;;
+        [Bb]*)
             QUALITY="best"
         ;;
-        *"s"*)
+        [Cc]*)
+            QUALITY="480"
+        ;;
+        [Ss]*)
             QUALITY="best"
         ;;
         *"1"*)
@@ -193,9 +204,6 @@ strl() {
         ;;
         *"8"*)
             QUALITY="best"
-        ;;
-        *"a"*)
-            QUALITY="audio_only"
         ;;
         *)
             QUALITY="best"
