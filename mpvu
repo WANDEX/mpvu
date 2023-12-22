@@ -244,6 +244,18 @@ main() {
             [ "$QUIET" -eq 0 ] && notify &
             ytdl "$@"
         ;;
+        *"trovo.live"*)
+            PROFILE='stream'
+            [ "$QUIET" -eq 0 ] && notify &
+            TITLE=$(basename "$URL")
+            strl "$@"
+        ;;
+        *"vkplay.live"*)
+            PROFILE='stream'
+            [ "$QUIET" -eq 0 ] && notify &
+            TITLE=$(basename "$URL")
+            strl "$@"
+        ;;
         *"twitch"*"/videos/"*)
             PROFILE='vods'
             [ "$QUIET" -eq 0 ] && notify &
