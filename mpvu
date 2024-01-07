@@ -157,13 +157,13 @@ ytdl() {
         [Aa]*) # [a - stands for audio] audio_only
             ytdl_format="${_ext_audio_q}/${_fll_audio_q}"
         ;;
-        [Bb]*) # [b - stands for the best] merge of bestvideo & bestaudio
-            ytdl_format="$_thebest_avq"
+        [Bb]*) # [b - best (manually defined)]
+            ytdl_format="$_ytdl_format_ext"
         ;;
         [Cc]*) # [c - best (pre-encoded)] simple format which not requires merge of the av streams
             ytdl_format="best"
         ;;
-        [Ss]*)
+        [Ss]*) # [s - source] merge of bestvideo & bestaudio
             ytdl_format="$_thebest_avq"
         ;;
         *) # [default] if not explicitly selected/passed via -q|-quality option
